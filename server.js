@@ -1,69 +1,83 @@
-const express = require('express'); 
-const Customer = require('./models/Customer'); 
-const Loan = require('./models/Loan');
-const morgan = require('morgan');
-const bodyParser = require('body-parser'); 
+const express = require("express");
+const Customer = require("./models/Customer");
+const Loan = require("./models/Loan");
+const morgan = require("morgan");
+const bodyParser = require("body-parser");
 
+const mongoose = require("mongoose");
 
-const mongoose = require('mongoose'); 
+mongoose.connect("mongodb://localhost:27017/testdb", function() {
+  console.log("database connection successful");
+});
 
-mongoose.connect('mongodb://localhost:27017/testdb', function(){
-    console.log('database connection successful'); 
+// build the express application
+const app = express();
 
-})
+//express app middlware
+app.use(morgan("dev"));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-const app = express(); 
-app.use(morgan('dev')); 
-app.use(bodyParser.json()); 
-app.use(bodyParser.urlencoded({extended: false})); 
-
-
-
-
-app.get('/customer', function(req, res){
-    return Customer.find({}).then(result => {
-        res.json(result); 
-    }).catch(err => {
-        throw err; 
+//get  for customers
+app.get("/customer", function(req, res) {
+  return Customer.find()
+    .populate("loans")
+    .then(result => {
+      return res.json(result);
     })
-})
-
-
-app.post('/customer', function(req, res){
-    const customer = new Customer({
-        name : req.body.name
-    }); 
-
-    return customer.save().then(result => {
-        return console.log(customer); 
+    .catch(err => {
+      throw err;
     });
+});
 
-
-})
-
-app.get('/loan', function(req, res){
-    return  Loan.find({}).then(loans => {
-        res.json(loans)
-    }).catch(err => {
-        throw err; 
+//get Loan
+app.get("/loan", function(req, res) {
+  return Loan.find({})
+    .then(loans => {
+      return res.json(loans);
     })
-})
-
-
-app.post('/loan', function(req, res){
-    const loan = new Loan({
-        name: req.body.name, 
-        customer: '5e9b0862551a284cf01bea88'
-        //oming back to implement this after the customer is created. 
-
+    .catch(err => {
+      throw err;
     });
+});
 
-    return loan.save().then(result => {
-        return loan; 
-    }); 
+//post for Customers
+app.post("/customer", function(req, res) {
+  const customer = new Customer({
+    name: req.body.name,
+    email: req.body.email
+  });
 
-})
-app.listen(3000, function(){
-    console.log('server running on port 3000')
-}); 
+  return customer.save().then(result => {
+    return console.log(customer);
+  });
+});
 
+//post route for Loans
+app.post("/loan", async function(req, res) {
+  //let customerdetails = {};
+
+  const loan = new Loan({
+    name: req.body.name,
+    customer: req.body.customer,
+    amount: req.body.amount,
+    term: req.body.term
+  });
+
+  const customer = await Customer.findById(req.body.customer);
+  if (!customer) {
+    throw new Error("Customer not found");
+  }
+
+  customer.loans.push(loan);
+
+  await customer.save();
+
+  return loan.save().then(result => {
+    return res.json(loan);
+  });
+});
+
+app.listen(3000, function() {
+  console.log("server running on port 3000");
+});
